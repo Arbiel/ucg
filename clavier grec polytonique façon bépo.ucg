@@ -1,0 +1,51 @@
+// les commentaires sont introduits par ce double //
+// clavier "Grec (bépo polytonique)"
+TLDE  $ # – ¶
+AB01  ω Ω ῳ ῼ
+AB02  ξ Ξ
+AB03  χ Χ
+AB04  . : … ·          // laissé identique à la touche bépo
+AB05  doux doux+aigu doux+circonflexe doux+grave
+AB06  ' ; ?
+AB07  ς Σ σ
+AB08  γ Γ ϝ Ϝ
+AB09  ψ Ψ
+AB10  φ Φ
+AC01  α Α ᾳ ᾼ
+AC02  υ Υ ϋ Ϋ
+AC03  ι Ι ϊ Ϊ
+AC04  ε Ε ἔ Ἔ
+AC05  , ·				// ce niveau 2 équivaut à ":" et ";" 
+AC06  κ Κ χ Χ
+AC07  τ Τ θ Θ
+AC08  σ Σ ς
+AC09  ρ Ρ ῥ Ῥ
+AC10  ν Ν
+AC11  μ Μ
+AC12  rude rude+aigu rude+circonflexe rude+grave
+AD01  ϐ Β β
+AD02  aigu aigu+doux aigu+rude
+AD03  π Π φ Φ
+AD04  ο Ο
+AD05  grave grave+doux grave+rude
+AD06  circonflexe circonflexe+doux circonflexe+rude
+AD07  β Β ϐ
+AD08  δ Δ ζ Ζ
+AD09  λ Λ
+AD10  θ Θ ϳ 
+AD11  ζ Ζ
+AD12  iota trema
+AE01  " 1 — „
+AE02  < 2 « “
+AE03  > 3 » ”
+AE04  ( 4 [ ≤
+AE05  ) 5 ] ≥
+AE06  @ 6 ^ 
+AE07  + 7 ± ¬
+AE08  - 8 − ¼
+AE09  / 9 ÷ ½
+AE10  * 0 × ¾
+AE11  = degree ≠ minutes
+AE12  % ` ‰ seconds
+LSGT  η Η ῃ ῌ
+SPCE space nobreakspace _ U202F
