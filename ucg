@@ -1,0 +1,1511 @@
+#! /bin/bash
+version="ucg_V2.2 2019_05_11 23:54";
+##############################################################################################################
+## Les notices ci-dessous, reconnaissables par la présence en début de ligne du caractère "#" suivi d'un chiffre, constituent la documentation, consultable en cours d'utilisation. Ces chiffres sont de simples repères et ne portent aucune valeur d'ordre, ni dans la succession des commentaires ci-dessous, ni dans la présentation des notices dans une fenêtre à onglets. L'ordre de présentation est défini dans la ligne encadrée par les lignes ##notices dans la fonction éponyme. 
+#############################################################################################################
+#7Liens
+#7Les présentes notices mentionnent des concepts et plus généralement utilisent du vocabulaire qui peuvent échapper à un lecteur non averti. Il est alors conseillé de se reporter aux informations présentées dans les pages mentionnées ci-dessous
+#7 
+#7Unicode :		https://fr.wikipedia.org/wiki/Unicode
+#7			https://fr.wikipedia.org/wiki/ISO/CEI_10646
+#7Signes diacritiques :	https://fr.wikipedia.org/wiki/Diacritique
+#7			https://fr.wikipedia.org/wiki/Diacritiques_de_l%27alphabet_grec
+#7Clavier :		https://doc.ubuntu-fr.org/clavier#les_touches_de_caracteres
+#7			https://doc.ubuntu-fr.org/tutoriel/configurer_le_clavier
+#7bépo :			http://bepo.fr/wiki/Accueil
+#7azerty amélioré : 	http://norme-azerty.fr/
+#7			https://www.afnor.org/wp-content/uploads/2019/04/dp_clavier-fr.pdf
+#7code pays :		https://www.iso.org/obp/ui/fr/#search
+#0Introduction
+#0Le présent script, «ucg» a été développé en bash pour les systèmes GNU/Linux essentiellement pour la saisie du grec polytonique (grec ancien) conformément, autant que faire se peut, à la disposition bépo. Il peut bien évidemment être utilisé pour la réalisation d'autres claviers (grec polytonique conformément a l'azerty, l'azerty amélioré).
+#0 
+#0En grec polytonique, les voyelles peuvent prendre 143 formes minuscules différentes, dont 7 sont des formes simples et 136 des formes infléchies c'est-à-dire des formes simples modifiées par l'adjonction de un à trois signes diacritiques. Jusqu'à 4 caractères (en fait 8 caractères, mais cette option n'est pas offerte par ucg) peuvent être produits par une touche selon qu'elle est utilisée seule, ou simultanément avec la touche majuscule, la touche AltGr ou ces deux touches. On parle alors de niveau 1, niveau 2, niveau 3 et niveau 4. Cependant, cette possibilité ne permet pas de faire correspondre une position (touche, niveau) du clavier à chaque forme des caractères grecs, minuscules et majuscules. On associe alors à quelques positions des caractères spéciaux pour produire des signes diacritiques. Les positions correspondantes ne produisant directement aucun caractère sont dites mortes ou muettes, par abus de langage on parle de touches mortes ou de touches muettes. Il faut alors indiquer, dans un fichier dit «fichier compose», quel caractère doit produire la succession des touches mortes et du caractère qui les suit.
+#0 
+#0Dans ces conditions, un utilisateur peut tout naturellement souhaiter obtenir en une unique frappe des caractères infléchis par un ou plusieurs signes diacritiques, plutôt que de devoir frapper successivement jusqu'à quatre touches, ou pouvoir infléchir un caractère par plusieurs signes diacritiques en une seule frappe. De plus, compte tenu de la diversité des inflexions des voyelles grecques, il serait extrèmement difficile pour un utilisateur de mémoriser la position du clavier qui produit tel ou tel caractère.
+#0 
+#0Le présent script vise à faciliter la réalisation de tels claviers sans qu'il soit nécessaire à l'utilisateur de s'inquiéter de sujets autres que la description de la disposition du clavier et des clauses du «fichier compose» qui indiquent l'impact des signes diacritiques sur les caractères qui les suivent.
+#0 
+#0Les exemples ci-dessous montrent comment décrire la production des touches du clavier.
+#0 
+#0	AD03  π Π
+#0	AC12  rude rude+aigu rude+circonflexe+iota
+#0	AC01  α Α ᾳ ᾼ
+#0 
+#0et les exemples ci-dessous, comment transcrire les clauses du «fichier compose».
+#0  
+#0	doux α ἀ
+#0	rude τ θ
+#0	rude grave ῃ ᾓ
+#############################################################################################################
+#1Utilisation
+#1Le script ne nécessite aucune installation particulière. Il convient de lui donner la propriété «Autoriser l'exécution du fichier comme un programme» et de l'enregistrer, sous quelque nom que ce soit, dans un partition montée avec l'option «exec». Un emplacement de choix est «~/bin». À défaut, il y a tout intérêt à l'enregistrer dans un répertoire énumére dans ${PATH}, de sorte que dans les deux cas il puisse être lancé par la commande :
+#1 
+#1«ucg [commande] [paramètres]»
+#1 
+#1Les principales commandes sont :
+#1
+#1 Ⅰ - clavier (ajout d'un clavier dans le système)
+#1 Ⅱ - xcompose (création d'un fichier de composition)
+#1 Ⅲ - notices (présentation des commentaires du script dans une fenêtre avec onglets)
+#1 
+#1Lors de la première exécution, si le répertoire «/home/.ucg» n'existe pas, le script demande le mot de passe pour passer en mode administrateur et crée le répertoire en question, ainsi que les sous-répertoires «alphabets», pour l'enregistrement de blocs Unicode et «gnu» pour l'enregistrement des fichiers «evdev.xml» et «${pays}» qui sont la modification des fichiers systèmes «/usr/share/X11/xkb/rules/evdev.xml» et «/usr/share/X11/xkb/symbols/${pays}».
+#1 
+#1${pays} est le code ISO 3166-1 alpha-2 du pays local. Le fichier «${pays}» contient la descripton des claviers valables pour le pays en question.
+#1 
+#1Le fichier «evdev.xml» contient la liste de tous les claviers du système.
+#1 
+#1Les fichiers systèmes originaux sont masqués par l'adjonction du caractère "." en tête de leur nom. À leur place sont créés des liens symboliques vers les fichiers de /home/.ucg/gnu. Un retour à l'état initial est ainsi toujours possible (voir l'onglet «Clavier»)
+
+################################################################################################################
+#4Diacritiques
+#4Les signes diacritiques infléchissent les caractères sur lesquels ils portent. Ils sont représentés dans les fichiers par des symboles, dits «symboles muets» et les touches auxquelles ils sont affectés sont dites touches mortes ou muettes car elles ne produisent aucun caractère, mais viennent infléchir, conformémant aux clauses du «fichier compose», le caractère qui les suit, ou qui suit, le cas échéant, une séquence de touches mortes.
+#4 
+#4La commande
+#4 
+#4«ucg diacritiques [valeur]»
+#4 
+#4affiche la liste des symboles muets classée par ordre alphabétique sur la sortie standard. La présence de l'option «valeur» permet d'en afficher également la valeur, un nombre hexadécimal utilisé pour les représenter dans les fichiers créés par «ucg». Les symboles muets définis par «ucg», à savoir :
+#4 
+#4«aigu»
+#4«grave»
+#4«circonflexe»
+#4«tréma»
+#4«iota»
+#4«rude»
+#4«doux» 
+#4 
+#4sont des synonymes des symboles standard du système. Ils peuvent être liés par le signe «+» et permettent alors d'infléchir le caractère sur lequel ils portent par plusieurs diacritiques en une seule frappe. Les symboles «tréma» et «iota», qui ne peuvent infléchir simultanément une même voyelle, sont synonymes. La «coronis» ne se distinguant pas de l'esprit doux, aucun symbole ne lui est attribué.
+####################################################################################################################
+#2Clavier
+#2La commande
+#2 
+#2«ucg clavier»
+#2 
+#2ajoute un clavier à l'ensemble des claviers disponibles dans le système. À la suite de son exécution, après avoir éventuellement redémarré l'ordinateur, le clavier devient disponible et peut-être sélectionné par l'outil graphique.
+#2 
+#2La commande permet de créer un nouveau clavier, soit de toutes pièces, soit dérivé d'un clavier existant ou de modifier un clavier existant, sous réserve que celui-ci ait été préalablement créé par "ucg clavier", c'est-à-dire ne soit pas un clavier original. La création d'un clavier dérivé à partir d'un clavier existant, qui peut lui-même avoir été créé par cette commande, permet de ne définir que les quelques touches du nouveau clavier qui diffèrent du clavier existant, alors que la création d'un clavier de toutes pièces nécessite la définition de toutes les touches du clavier.
+#2 
+#2La commande affiche une fenêtre permettant à l'utilisateur :
+#2 
+#2 Ⅰ - de choisir, dans un menu déroulant, le clavier à modifier ou à partir duquel créer le nouveau clavier
+#2 Ⅱ - de définir le nom du nouveau clavier; dans le cas de la création d'un nouveau clavier, en l'absence de nom, le résultat est affiché sur la sortie standard
+#2 Ⅲ - de choisir, par navigation dans l'arborescence des fichiers, le fichier de définition de la disposition du clavier
+#2 Ⅳ - -de définir l'indicateur permettant, en cours de session, d'identifier le clavier actif (ucg par défaut).
+#2 
+#2La suppression d'un clavier n'est pas prévue. Cependant, compte tenu de ce qu'un utilisateur ne créé probablement que quelques claviers, et que les fichiers nécessaires à la création de ces claviers peuvent très facilement être mémorisés, il est possible de supprimer tout ce que le script a créé en exécutant les commandes suivantes :
+#2 
+#2 pays=<code ISO 3166-1 alpha-2 du pays local>; cd /home/.ucg/gnu && sudo rm {evdev.xml,${pays}};
+#2 cd /usr/share/X11/xkb; sudo mv -fT rules/.evdev.xml rules/evdev.xml && sudo mv -fT symbols/.${pays} symbols/${pays}
+#################################################################################################################
+#3Touches
+#3On distingue sur le clavier physique des touches alphabétiques et des touches de fonction. Seules les touches alphabétiques sont visées par «ucg». À une touche alphabétique, il est possible de faire correspondre jusqu'à 8 caractères ou symboles muets. «ucg» ne gère que des touches à 4 niveaux.
+#3 
+#3La correspondance entre les touches et les caractères et symboles muets est définie par la formulation
+#3 
+#3<nom_de_la_touche> <caractère de niveau 1> <caractère de niveau 2> <caractère de niveau 3> <caractère de niveau 4>
+#3 
+#3Il faut bien comprendre ici que ce sont ces clauses qui définissent les relations éventuelles entre les caractères. Et si l'on appelle «touche majuscule» celle qui permet de produire le caractère de niveau 2, c'est parce que, de manière standard, lorsque le caractère de niveau 1 est une minuscule, celui de niveau 2 est la majuscule correspondante. Lorsque l'on considère la rangée AE, celle des chiffres, on constate qu'il n'y a aucun rapport entre les caractères de niveau 1 et 2. De même, l'AFNOR, en définissant le clavier azerty amélioré a ignoré ce standard en associant non plus au niveau 2 mais au niveau 4 les majuscules de nos voyelles accentuées pour des raisons évidentes d'ergonomie vue la rareté de celles-ci.
+#3 
+#3Le nom de la touche indique sa position sur le clavier. Il est composé de 4 caractères, deux majuscules et deux chiffres : A (pour alphabétique), suivi d'une lettre de A à E pour la rangée, en partant de la rangée la plus proche de l'utilisateur et sur deux positons, de 01 à 12, voire plus, pour la position à partir de la gauche de la touche dans la rangée. Quelques touches sont historiquement nommées par le caractère qu'elles produisent (ou produisaient) dans le clavier qwerty.
+#3 
+#3Ainsi, la touche gravée «A» sur un clavier azerty se nomme AD01, celle gravée «N», AB06. Mais sont nommées SPCE, LTGT et TLDE celles qui produisent respectivement l'espace (la barre du milieu de la rangée la plus proche de l'utilisateur), les caractères < et > (sa position fait qu'elle aurait pu être nommée AB00) et ~ (sa position fait qu'elle aurait pu être nommée AE00).
+#3 
+#3Les caractères peuvent être représentés par 
+#3 Ⅰ - le caractère à produire, tels que a % ᾳ , protégé ou non par " ou '
+#3 Ⅱ - le code unicode du caractère : U0061 U0025 U1FB3 
+#3 Ⅲ - le nom d'un symbole muet ou toute combinaison des symboles définis par «ucg», par exemple «aigu+iota»
+#3 Ⅳ - «space» «nobreakspace» pour les caractères invisibles espace et espace insécable ; (U202F pour l'espace insécable fin)
+####################################################################################################################
+#5Compose
+#5La commande
+#5 
+#5«ucg xcompose <destination> <source>»
+#5 
+#5crée le fichier de composition nommé <destination> à partir du fichier <source>.
+#5 
+#5Le «fichier compose» est la concaténation des divers fichiers de composition créés par l'utilisateur. C'est généralement le fichier «~/.XCompose». Il est défini dans la page du manuel
+#5 
+#5man xcompose
+#5 
+#5Lorsque <destination> n'est pas mentionné, le résultat est présenté sur la sortie standard. Lorsque <source> n'est pas mentionné, le script analyse la description des caractères présentée dans les pages de l'Unicode https://unicode-table.com/fr/. Lorsque plusieurs symboles muets infléchissent conjointement un caractère, comme le font, par exemple, «aigu», «iota» et «doux» pour infléchir α en ᾄ, toutes les séquences possibles de ces symboles sont présentes dans le fichier, ainsi que les séquences incluant toutes les combinaisons possibles de ces symboles avec «+», c'est-à-dire telles que «doux+iota» «aigu», aigu» «doux+iota» «ou «aigu+iota» «doux», «doux» «aigu+iota» …, et même «aigu+doux+iota». Sont également présentes les séquences nécessaires pour produire ce même caractère ᾄ à partir de caractères partiellement infléchis. On peut ainsi associer par exemple ᾳ, ἀ, ᾀ … à des touches du clavier et les infléchir par le ou les symboles muets nécessaires pour produire le caractère souhaité.
+#5 
+#5Comme ce sont les clauses du «fichier compose» qui définissent comment les symboles muets agissent sur les voyelles qui les suivent, ces symboles peuvent être vus, non plus comme équivalents à des signes diacritiques, mais comme des touches modificatrices, au même titre que celles qui définissent le niveau à utiliser pour la production des caractères, à la différence près qu'elles précèdent la touche au lieu d'être utilisées conjointement avec elle. Le «fichier compose» permet même de produire non plus un seul caractère, mais une chaîne de caractères. L'utilisateur peut ainsi définir des clauses telles que
+#5 
+#5rude π φ
+#5grave κ κὰι
+#5grave γ γὰρ
+#5circonflexe τ τῶν
+#5 
+#5La prise en compte du fichier compose nécessite l'utilisation de la méthode de saisie «uim» qui peut ne pas être présente dans le système. Son installation et activation sont réalisées par la commande
+#5 
+#5«ucg uim»
+#5 
+################################################################################################################
+#9Ἑλληνιστί
+#9La langue ancienne a été, pendant des siècles, écrite seulement en capitales. Les minuscules et les signes diacritiques sont apparus postérieurement, les signes diacritiques à la période hellénistique et ils ne sont devenus systématiques qu'au Moyen Âge ; ils sont maintenant obligatoires.
+#9 
+#9La période  hellénistique a défini trois accents, aigu, grave et circonflexe. Ces trois accents ont été remplacés en grec moderne par l'accent tonique. Le glyphe d'une voyelle infléchie de l'accent tonique est généralement identique à celui de la même voyelle inféchie de l'accent aigu, sauf à ce que la police de caractères ne les présente différemment. Ainsi, dans la plupart des cas, «ά» du grec moderne accentué du tonique (U03B1) ne se distingue pas de «ά» du grec polytonique accentué de l'aigu (U1F71). Mais ces caractères visuellement identiques ne doivent pas être confondus et le caractère du grec moderne ne doit pas être utilisé en grec polytonique.
+#9 
+#9L'Unicode a également défini d'autres caractères tout à fait distincts et dont les glyphes sont identiques. C'est le cas du point et virgule latin «;» (U003B) et du point d'interrogation grec «;» (U037E).
+#9 
+#9La commande
+#9 
+#9"ucg normalise <fichier>"
+#9 
+#9lit <fichier>, ou à défaut l'entrée standard, et affiche sur la sortie standard le texte dans lequel elle a remplacé les éventuels caractères infléchis de l'accent tonique par les caractères infléchis de l'accent aigu, et le point-virgule latin par le point d'interrogation grec.
+###############################################
+#8Dépendances
+#8 
+#8Le script utilise les programmes
+#8 
+#8sed, grep, tempfile, xxd, gawk, stat, id
+#8kill, pidof
+#8yad, zenity
+#8wget, xmlstarlet
+#8notify-send
+#8im-config
+######################################################
+#
+# Fonctions de services élémentaires
+#
+####################################################
+	function version {
+		local vsn="${version}\nIntroduction de notices explicativesn\nTraitement des touches muettes correspondant à plusieurs diacritiques\nInstallation du clavier\nCréation des fichiers de composition\nInstallation et activation méthode de saisie uim\nNormalisation des textes grecs non conformes";
+		echo ; echo -e "${vsn}";	
+	}
+	
+	function horodate {
+		echo "# ${version} exécutée le ${gbl_date}";
+		return ;
+		}
+###############################################
+# Affichage de l'aide tirée des commentaires
+###############################################
+	function notices () {
+		local i j com liste_tab f_txt f_aide
+		com="$(cat "${gbl_script}" | sed -n -r "\-^#[[:digit:]]+[^[:digit:]]*-p")";
+		! which yad &>/dev/null && {
+			echo "L'affichage des élements de la notice nécessite yad. À défaut en voila le contenu, dans lequel les éléments de la notice sont des commentaires de bash reprérés par #<numéro>"; echo; echo;
+			echo "${com}"
+			return 0;
+		}
+		{ code="$(dd if=/dev/urandom bs=2 count=1 | hexdump -v -e '/2 "%02u"')" ; } 2>/dev/null
+		j=0
+##notices
+		for i in 7 0 1 2 4 3 5 8 9 ; do
+##notices
+			j=$((j+1));
+			f_aide="$(tempfile -p ucg -s .aide)";
+			f_txt="$(tempfile -p ucg -s .txt)";
+			texte="$(echo "${com}" | sed -n -r "/^#${i}[^[:digit:]]/{s/#${i}//;p}")";
+# avec remplacement des espaces du titre de section par un espace insécable, car yad supprime les "soulignés"
+			titre_tab="$(echo "${texte}" | head -1 | sed -r "s/^[[:space:]]*(.*)[[:space:]]*$/\1/" | sed -r "s/[[:space:]]+/ /g")";
+			echo "${texte}" | sed -r 1d >"${f_aide}" ;
+			yad --plug=${code} --tabnum=$((${j})) --show-uri --text-info --wrap --filename="${f_aide}" &>/"${f_txt}" &
+			liste_tab="${liste_tab} --tab=${titre_tab}";
+			done
+		yad --notebook --key=${code} --title="Ucg" --wrap --center --width=1300 --sticky --height=600 ${liste_tab};
+		return 0;
+	}
+#####################################################################
+# Énoncé vocal ou affichage d'une annonce ou d'un message d'erreur
+####################################################################
+	function annonce {
+		local actions="${1}"
+		local msg="${2}"
+		local resume="${3}"
+		local icone="${4}"
+		local cr="0";
+		for action in ${actions}; do
+			case "${action}"  in
+				notifier) pid=$(pidof play); [ -n "${pid}" ] && kill -9 ${pid}; notify-send -u critical -i "${icone}" "${resume}" "${msg}" ;;
+				questionner)
+					yad --title="${resume}" --mouse --text="${msg}"  --timeout=15 --width=500 --button="Oui:0" --button="Non:1" --on-top ;
+					cr="${?}" ;;
+				informer) zenity --warning --title="${resume}" --text="${msg}" --width=700  --timeout=0  ;
+				cr="${?}";;
+				esac;
+			done;
+	return $((${cr}));
+}
+#############################################################################
+# Représentation hexadécimale d'un caractère
+#############################################################################$
+	function hxdp {
+		echo -n "${1}" | xxd -p | gawk '{$1=$1}1' FPAT='.{2}' OFS=- ;
+		}
+#############################################################################
+# Extraction d'une valeur enclose entre des apostrophes ou de doubles apostrophes
+#############################################################################$
+	function extraction {
+		echo -n "${1}" | sed -r "s/^(\"|')(.+)$/\2/" | sed -r "s/(.+)(\"|')$/\1/"
+		}		
+#############################################################################
+# Calcul de la valeur binaire d'un point de code, ou d'une chaîne de carac. hexa
+#############################################################################$
+	function hxbin {
+		local pu="${1}"
+		local hexa="$(echo ${pu} | tr -d "Uu" )";
+		local nbx="${#hexa}"
+		declare -i binr=0
+		eval "binr=16#${hexa}"
+		echo "${binr}"
+		return 0
+		}
+#############################################################################
+# Passage en mode administrateur pour l'enregistrement des claviers dans le répertoire système
+#############################################################################$		
+	function sudo () {
+# paramètres pour le dialogue de saisie du mot de passe par zenity
+		local ai_titre="Authentification nécessaire"
+		local ai_ivc="Arrêt"
+		local ai_acc="Continuer"
+# fichier du mot de passe, non chiffré
+		local ai_fmp=${AI_FMP:-~/.lathraios}
+# la présence du "~" n'est pas bien interprétée dans le fichier de demande du mot de passe
+		ai_fmp="$(echo "${ai_fmp}" | sed -r "s|~|/home/${USER}|")";
+		local ai_sudo="$(whereis -b sudo | cut -d " " -f 2)"
+		local tmpf=$(tempfile -m 660 -p ap_mp) && touch "${tmpf}" ;
+# programme de saisie du mot de passe, appelé par la variable d'environnement SUDO_ASKPASS de sudo
+		local ask=$(tempfile -p ap_su -s .sh) && chmod u+rwx "${ask}";		
+		local ai_nbp="${#}"
+# enregistrement du programme de saisie du mot de passe dans le fichier $ask et d'affichage sur /dev/stdout
+		cat 1>"${ask}" <<AUIE
+#! /bin/bash
+touch "${ai_fmp}" ;
+[ -s "${ai_fmp}" ] && cat "${ai_fmp}" || { zenity --password --title="${ai_titre}" --ok-label="${ai_acc}" --cancel-label="${ai_ivc}" 1>"${tmpf}" 2>/dev/null && cat "${tmpf}"|| cat /dev/null ; } ;
+AUIE
+		chmod u+x "${ask}" ;
+		valid=true ;
+		env SUDO_ASKPASS="${ask}" ${ai_sudo} -Av || valid=false ;
+# mémorisation du mot de passe correct dans le fichier $AI_FMP s'il existe
+		${valid} && [[ -n "${AI_FMP}" ]] && ! [ -s "${ai_fmp}" ] && { cp -T "${tmpf}" "${ai_fmp}" ; chmod =400 "${ai_fmp}" ; }
+		rm "${tmpf}" "${ask}"
+		! ${valid} && return 1 ;
+# execution de la commande passée en paramètre à sudo
+		[ $((${ai_nbp})) -eq 0 ] || ${ai_sudo} "${@}"
+	}
+####################################################
+# Installation et activation de la méthode de saisie uim pour la prise en compte du fichier compose
+##################################################
+	function uim {
+		im-config -l | grep -q uim || sudo apt install uim ;
+		im-config -n uim ;
+		annonce "informer" "Pour rendre «uim» opérationnelle, il faut probablement redémarrer l'ordinateur" "ucg : installation «uim»";
+		
+	}
+#####################################################
+#
+# Fonctions à vocation locale
+#
+####################################################
+	function init_rep_ucg {
+		! [[ -d "${gbl_dir_ucg}" ]] && mkdir -p "${gbl_dir_ucg}" 2>/dev/null
+		! [[ "${?}" = "0" ]] && { sudo mkdir -p "${gbl_dir_ucg}" || return 1; }
+		! [[ "$(id -u)" = "$(stat --format %u "${gbl_dir_ucg}")" ]] && sudo chown -R ${USER}:${USER} "${gbl_dir_ucg}" ; 
+		! [[ -d "${gbl_dir_gnu}" ]] && mkdir -p "${gbl_dir_gnu}" ;
+		! [[ -d "${gbl_dir_alphabets}" ]] && mkdir -p "${gbl_dir_alphabets}" ;
+		}
+	function init_gbl {
+# initialisations selon les besoins
+		gbl_ucg="UCG";
+		gbl_dir_ucg="${UCG_DIR:-"/home/.ucg"}"; # répertoire des fichiers ucg
+		gbl_dir_alphabets="${gbl_dir_ucg}/alphabets" ;
+		gbl_dir_gnu="${gbl_dir_ucg}/gnu";
+		gbl_script="${0}";
+		gbl_date="$(date +"%d/%m/%y %T")";
+		gbl_erreur="";
+		gbl_test=false;
+		gbl_ifs="${IFS}" ; # pour restauration après chaque utilisation
+		gbl_signe_inclus="✓" # coche pour marquer l'inclusion des blocs dans l'alphabet (U2713)
+		gbl_compose="/home/${USER}/.XCompose";
+#		gbl_alphabet="$(tempfile --prefix="ucg_" --suffix=".alp")";
+# UCG_X11 : le répertoire des fichiers du système de gestion du clavier (a priori /usr/share/X11)
+		gbl_dir_xkb="${UCG_XKB:-"/usr/share/X11/xkb"}";
+		gbl_keysymdef="/usr/include/X11/keysymdef.h";
+		gbl_dir_symbols="${gbl_dir_xkb}/symbols";
+# en attendant de savoir s'il l'on peut conserver les valeurs hexadécimales des muets
+		gbl_gen_symboles=false ;
+		gbl_evdev_xml="${gbl_dir_xkb}/rules/evdev.xml";
+		gbl_web_Unicode="https://unicode-table.com";
+		gbl_lg_tlstr="${1:-$(cut -d "_" -f 1 <<< "${LANG}";)}" ; # langue courante
+# suppression de la clause DOCTYPE non comprise par xmlstarlet
+#		gbl_evdev="$(sed -r "/DOCTYPE/d" "${gbl_evdev_xml}")";
+# exportation pour traduction des libellés de evdev.xml dans la langue de l'utilisateur
+		export TEXTDOMAIN="xkeyboard-config";
+		export TEXTDOMAINDIR="/usr/share/locale";
+		[[ -d "${gbl_dir_ucg}" ]] && [[ -d "${gbl_dir_gnu}" ]] && [[ -d "${gbl_dir_alphabets}" ]] && return 0 ;
+		init_rep_ucg
+	}
+	
+############################################################################
+# Echo d'une liste de paramètres, chacun précédé de son nom, soit un par ligne, soit en une ligne bash
+#############################################################################
+	function eb { for _ in "${@}"; do echo -n -e "${_}=\"${!_}\";\t" ; done ; echo; } ;
+	function es { [ -f "${1}" ] && cat "${1}" || echo "${1}" ; };
+	function ev { ! ${gbl_test} && return;
+		local ifs="${IFS}";
+		IFS="${gbl_ifs}";
+		for _ in "${@}"; do declare -p ${_} > /dev/stderr ; done ; IFS="${ifs}" ;
+		} ;
+	
+################################################################
+# Suppression des lignes commentaires au sens bash, vides ou ne comportant que des espaces
+###########################################################$
+	function sup_nul {
+		local fic;
+		[[ -z "${1}" ]] && fic="/dev/stdin" || fic="${1}";
+		grep -v -E "^[[:space:]]*$|^[[:space:]]*#+" < "${fic}";
+	}
+
+################################################################
+# Suppression des commentaires au sens xkb, puis au sens bash
+###########################################################$
+	function sup_com {
+		local fic fic2;
+		fic2="$(tempfile --prefix="cla_" --suffix=".txt")";
+		[[ -z "${1}" ]] && fic="/dev/stdin" || fic="${1}";
+		grep -v -E "^[[:space:]]*$|^[[:space:]]*(#+|//)" < "${fic}" | sed -r "s_(^[^/]*)(//.*$)_\1_"		
+	}
+############################################################
+# Activation de la trace
+#############################################################
+	function tester {
+		local fic_trace="/tmp/xtrace_$(echo ${gbl_date} | tr "/:" "._").log"
+		! [[ -e "${fic_trace}" ]] && touch "${fic_trace}";
+		exec 6>> "${fic_trace}" ;
+		set -o xtrace
+		export BASH_XTRACEFD=6
+		init_gbl
+		gbl_test=true;		
+		"${@}";
+		set +o xtrace;
+		[[ -s "${fic_trace}" ]] && gedit "${fic_trace}" ;
+#		[[ $((${#})) -ge 1 ]] && { "${@}"; set +o xtrace; } ;
+	}
+
+###############################################################
+#
+# Constitution des alphabets
+#
+##############################################################
+
+#############################################################
+# Appel de la page Unicode
+#############################################################
+
+	function alp_wget {
+		local cr="0" ;
+		local page_web="${gbl_web_Unicode}/${gbl_lg_tlstr}/" ;
+		[[ -n "${1}" ]] && page_web="${page_web}${1}"
+		wget -q -O /dev/stdout "${page_web}" || {
+			cr="${?}";
+			case "${cr}" in
+				"4") gbl_erreur="Erreur réseau ; connexion Internet ?" ;;
+				"7") gbl_erreur="Erreur de protocole dans l'appel de "'"'"${page_web}"'"'"" ;;
+				"8") gbl_erreur="Le serveur "'"'"${page_web}"'"'" a renvoyé un code d'erreur";;
+				*) gbl_erreur="L'erreur ${cr} de wget est survenue lors de la connexion à  "'"'"${page_web}"'"'"" ;;
+				esac ;
+			echo "${cr} : ${gbl_erreur}" ;
+			}
+		return $((${cr})) ;
+		}
+# https://c.gmx.fr/@563000663877884245/-s4mgnIRTL2D2Oku4vWY-Q		
+###########################################################
+# Création de la liste des noms de blocs
+###########################################################
+	function alp_nom_blocs {
+		local bloc="${1}";
+		local blocs_html="$(tempfile --prefix="alp_" --suffix=".html")";
+		local blocs_txt="$(tempfile --prefix="alp_" --suffix=".txt")";
+		local cr;
+		alp_wget > "${blocs_html}" && {
+			{ echo "<ucg>" && sed -n -r "/data-begin/p" "${blocs_html}" && echo "</ucg>" ; } > "${blocs_txt}" ;
+			case "${bloc}" in
+				"") xmlstarlet sel -t -m "//a" -v "."  -n "${blocs_txt}" | sort ;;
+				"+") cat "${blocs_txt}" ;;
+				*) xmlstarlet sel -t -m "//a[.='${bloc}']" -v "./@data-key" -n "${blocs_txt}" ;;
+				esac ;
+			}
+		cr="${?}";
+		${gbl_test} || rm /tmp/alp_* ;
+		return $((${cr}));
+		}
+
+###################################################
+# visualisation de la page des caractères ou mémorisation des définitions de caractères
+####################################################
+	function alp_charge_page {
+		local affichage=${1};
+		local bloc;
+		local a="<ul class=\\\"unicode_table";
+		local z="</ul>"
+		bloc="blocks/$(alp_nom_blocs "${2}")" ;
+#		${affichage} && xdg-open "${gbl_web_Unicode}/${gbl_lg_tlstr}/${bloc}" &>/dev/null || alp_wget "${bloc}" | sed -rn "\|^[[:space:]]*${a}|,\|^[[:space:]]*${z}|{/title=/p}" ;
+		${affichage} && xdg-open "${gbl_web_Unicode}/${gbl_lg_tlstr}/${bloc}" &>/dev/null || alp_wget "${bloc}" | sed -rn "\|^[[:space:]]*${a}|,\|^[[:space:]]*${z}|{/title=/s|^[[:space:]]*||p}" ;
+		return $((${?}));
+	}
+	
+######################################################
+# interprétation du libellé contenu dans les pages Unicode
+##################################################### 
+	function alp_libel {
+		local anal_dia="${1}";
+		local fic_dia="$(tempfile --prefix="alp_" --suffix=".txt")";
+		local mot mot_minus minus majus grec qualif
+		minus=false
+		majus=false
+		lettre=false
+		grec=false
+		qualif=false
+		ltr_xc=
+# vocab permet l'analyse du libellé en français ou en anglais et la recherche des diacritiques qui y sont présents
+# À chaque valeur de vocab différente de _.* correspond une variable booléenne qui marque sa présence dans le libellé
+		local -grA vocab=([lettre]="lettre" [letter]="lettre"  [ligature]="lettre"  \
+			[greek]="grec" [grecque]="grec" [grec]="grec" [copte]="copte" [coptic]="copte" \
+			[latin]="latin" [latine]="latin" \
+			[small]="minus" [minuscule]="minus" \
+			[capital]="majus" [majuscule]="majus" \
+			[brève]="_brève" [vrachy]="_brève" \
+			[macron]="_macron" \
+			[iota_souscrit]="_iota" [ypogegrammeni]="_iota" [prosgegrammeni]="_iota" \
+			[accent]="_tonique" [tonos]="_tonique" \
+			[varia]="_grave" [accent_grave]="_grave" \
+			[accent_aigu]="_aigu" [oxia]="_aigu" \
+			[perispomeni]="_circonflexe" [circonflexe]="_circonflexe"  \
+			[tréma]="_tréma" [dialytika]="_tréma" \
+			[esprit_doux]="_doux" [psili]="_doux" \
+			[esprit_rude]="_rude" [dasia]="_rude") ;
+		cat /dev/null 1>"${fic_dia}" ;
+# la commande sed permet de remplacer par un blanc souligné l'espace entre iota et souscrit,
+# entre un accent et son déterminant éventuel (aigu, grave, …), etc … pour les transformer en mots
+# et les distinguer ainsi de la présente éventuelle des mots "souscrit", "grave", … dans d'autres contextes.
+#
+# <li class="symb" onclick="location.href='/fr/1F2A/'" title="Lettre majuscule grecque êta esprit doux et accent grave"><a href="/fr/1F2A/">1F2A</a></li>
+#
+			for mot in $(xmlstarlet sel -t  -v "//li/@title" <<< "${anal_dia}" | sed -r "s/(accent|iota|esprit)[[:space:]]+(aigu|grave|souscrit|doux|rude)/\1_\2/g"); do
+				mot_minus="${mot,,?}" # passage en minuscules
+				mot_traduit="${vocab[${mot_minus}]}";
+				case "${mot_traduit}" in
+					"_"*) ${lettre} && echo "${mot_traduit:1}" 1>> "${fic_dia}";; # diacritique : la mémoriser, si le libellé indique qu'il s'agit d'une lettre
+					"" ) ${lettre} && [[ -z "${ltr_xc}" ]] && ltr_xc="${mot_minus}" ;; # le nom du caractère : première occurence d'un mot non traduit après tout mot dont la traduction est "lettre"
+					* ) eval "${mot_traduit}=true";; # dans les autres cas,
+				esac;
+				done
+			${majus} && [[ -n "${ltr_xc}" ]] && ltr_xc="${ltr_xc^^}";
+			echo -n "${ltr_xc}:" ; cat "${fic_dia}" | sort | tr "\n" " " | sed -r "s/^(.*) $/\1/";
+			rm /tmp/alp_* ;
+		}
+
+################################################################
+# Création du l'alphabet
+##############################################################
+	function alphabet {
+		local mode="${1:-"standard"}" ;
+		local blocs_inclus bloc;
+		blocs_inclus="$(tempfile --prefix="alp_" --suffix=".txt")" ;
+		touch "${blocs_inclus}"
+		local table_car
+		table_car="$(tempfile --prefix="ajlp_" --suffix=".txt")" ;
+		touch "${table_car}"
+#	ls -l "${table_car}"
+		local cr="0" ;
+		local alpha ;
+		case "${mode}" in
+			s | standard) echo "Grec et copte, Grec étendu" | tr "," "\n" | sed -r "s/^[[:space:]]+//" > "${blocs_inclus}" ;;
+			e | étendu) echo "Latin de base, Supplément latin-1, Grec et copte, Grec étendu" | tr "," "\n" | sed -r "s/^[[:space:]]+//" > "${blocs_inclus}" ;;
+#			p | personnalisé) alp_blocs | sed -r "s/${gbl_signe_inclus}//g"> "${blocs_inclus}"; cr="${?}" ;;
+			- ) cat /dev/stdin > "${blocs_inclus}" ;;
+#			 touch "${blocs_inclus}" ;
+			* )	while [[ $((${#})) -gt 0 ]] ; do 
+					echo "${1}" >> "${blocs_inclus}" ;
+					shift ;
+					done ;
+				: ;;
+			esac ;
+		while [[ "${cr}" = "0" ]] && read bloc; do
+#			[[ "${bloc:0:1}" = "${gbl_signe_inclus}" ]] && bloc="${bloc:1}";
+			alpha="${gbl_dir_alphabets}/${bloc}.alp" ;
+			[ -a "${alpha}" ] && mv -fT "${alpha}" "${alpha}῀";
+			annonce "notifier parler" "Alphabet en cours de création : \"${bloc}\"" "Création des alphabets";
+			cat /dev/null > "${alpha}";
+			alp_charge_page false "${bloc}" > "${table_car}" || { cr="${?}" ; break ; } ;
+			while read def_car; do
+				codeu="U$(xmlstarlet sel -t -v "//li/a/@href" <<< "${def_car}" | cut -d "/" -f 3)";
+				carg="$(eval "echo $'\\${codeu}'")";
+				titre="$(xmlstarlet fo -o -e utf-8 - <<< "${def_car}" | xmlstarlet sel -t -v "//li/@title" )"; 
+				decod="$(alp_libel "${def_car}")";
+				echo ":${carg}:${codeu}:$(hxdp ${carg}):${decod}:${titre}:${bloc}:" >> "${alpha}";
+			done < "${table_car}" | grep "^[[:space:]]*<li";
+		done < "${blocs_inclus}" ;
+		[[ $((${cr})) -gt 0 ]] && {
+			annonce "notifier parler" "${bloc} : ${gbl_erreur}" "Création de l'alphabet"
+			rm "${blocs_inclus}" ;
+			}
+#	${gbl_test} || rm /tmp/alp_* ;
+	return $((${cr}));
+	} ;
+
+##############################################################
+# Épèle la phrase passée en paramètre
+#########################################################
+	function epl {
+		local blocs_unicode;
+		local fic_temp="$(tempfile --prefix="ucg_" --suffix=".tmp")";
+		function ccu {
+			local rc carg="${1}"
+			local temp;
+			rep="${tab_carg[${carg}]}";
+			[[ -n "${rep}" ]] && { echo "${rep}" ; return 0 ; }
+			local codeu="$(unicode "${carg}")";
+			local i=0
+			declare -i val_car=$(hxbin "${codeu}") car_fin;
+			while [[ car_fin -lt val_car ]]; do
+				i=$((i+1));
+				bloc_html="$(cat "${blocs_unicode}" | xmlstarlet sel -t -c "//ucg/a[${i}]")";
+				fin="$(echo "${bloc_html}" | xmlstarlet sel -t -m "//a" -v "./@data-end")";
+				car_fin=$(hxbin "${fin}");
+				done ;
+			bloc="$(echo "${bloc_html}" | xmlstarlet sel -t -m "//a" -v ".")";
+			[[ -z "${tab_alpha[${bloc}]}" ]] && {
+				{ echo "<ucg>" ; alp_charge_page false "${bloc}" ; echo "</ucg>" ; } > "${fic_temp}";  tab_alpha[${bloc}]="$(grep -v -E "\/00(26|3C)\/" "${fic_temp}" | xmlstarlet fo -o -e utf-8 -)";
+				}
+			def_car="$(echo "${tab_alpha[${bloc}]}" | xmlstarlet sel -t -c "//li/a[.='${carg}']/.." )";
+			titre="$(xmlstarlet fo -o -e utf-8 - <<< "${def_car}" | xmlstarlet sel -t -v "//li/@title" )"; 
+			decod="$(alp_libel "${def_car}")";
+			tab_carg["${carg}"]=":${carg}:${codeu}:$(hxdp ${carg}):${decod}:${titre}:${bloc}:"
+			echo "${tab_carg["${carg}"]}";
+			return 0;
+		}
+		blocs_unicode="$(tempfile --prefix="alp_" --suffix=".html")";
+		alp_nom_blocs "+" > "${blocs_unicode}" || return $((${?})) ;
+		for mot in ${*}; do
+			echo "${mot}" ;
+			while read -n1 car; do 
+				[[ -z "${car}" ]] && break || ccu "${car}" ;
+				done <<< "${mot}";
+			done ;
+		${gbl_test} || rm /tmp/ucg_* ;
+	 } ;
+		
+#############################################################################
+#
+# Création du fichier de composition par les touches muettes (à introduire dans le fichier ~/.XCompose)
+#
+###########################################################################
+
+		
+#############################################
+# Recherche de la liste résiduelle des diacritiques après application d'un sous-ensemble
+#############################################
+
+	function retirer {
+		[[ -z "${1}" ]] && { 
+			tr " " "\n" <<< "${2}" | sort | tr "\n" " "; return ; }
+		local fic_retrait="$(tempfile --prefix="ucg_" --suffix=".txt")";
+		local fic_ensemble="$(tempfile --prefix="ucg_" --suffix=".txt")";
+		tr " " "\n" <<< "${1}" > "${fic_retrait}";
+		tr " " "\n" <<< "${2}" > "${fic_ensemble}";
+		grep -v -f "${fic_retrait}" "${fic_ensemble}" | sort | tr "\n" " " | sed -r -e "s/^(.*)[[:space:]]+$/\1/" ;
+		${gbl_test} || rm /tmp/ucg_* ;		
+		}
+##################################################
+# Construction de la table de traduction des symboles muets en valeur hexadécimale
+################################################
+	function diacritiques {
+		local valeur="${1}";
+		local a b;
+#		(for symbol in "${!vh[@]}"; do [[ "${ordre}" = "valeur" ]] && echo "${vh[$symbol]}=${symbol}" || echo "${symbol}=${vh[$symbol]}"; done;) | sort ;
+		(for symbol in "${!vh[@]}"; do [[ $((${#symbol})) -gt 1 ]] && [[ "$(echo "${symbol}" | sed -r "s/^(.{2}).*$/\1/")" != "0x" ]] && { echo -n "${symbol}"; [[ ${valeur} = "valeur" ]] && echo -n "=${vh[$symbol]}"; echo; } done;) | sort;
+}
+###################################################
+# Affichage de la valeur des touches mortes passées paramètre
+###################################################
+	function dead {
+		while  [[ $((${#})) -gt 0 ]]; do
+			echo "vh[${1}]=${vh["${1}"]}";
+			shift;
+			done;
+		} ;
+######################################################
+# Traduction du point de code en symbole hexadécimal (apparemment inutile)
+#####################################################
+	function xcp_symbole {
+		local pu="${1}" # point Unicode à traduire en symbole
+		set -o pipefail
+		[[ -e "${gbl_keysymdef}" ]] && grep -m 1 -E "^.*U\+${pu:1}" "${gbl_keysymdef}" | sed -r "s/^[^_]+_([^[:space:]]+).*$/\1/" || echo "${pu}";
+		set +o pipefail
+	}
+#####################################################
+# Par permutation, construction des lignes relatives à un caractère marqué de diacritiques
+#####################################################
+	function xcp_lignes {
+#		local car="${1}" ; # caractère à marquer pour obtenir le caractère en cours de traitement
+#		local symb_U="${2}" ; # point Unicode du caractère à marquer
+		declare -n table_elem="${1}"
+#		ev table_elem
+		local indices j ic detail symb symb_hexa nb_elem
+		local -a i_perm ;
+#		[[ "${table_elem}" = "compo" ]] &&  nb_elem=${#table_compo[*]} || nb_elem=${#table_nec[*]} ;
+		nb_elem=${#table_elem[*]}
+#		ev nb_elem
+		for indices in ${gbl_ind_perm[$((nb_elem))]}; do
+			unset i_perm
+			i_perm=($(echo ${indices} | tr "|" " "));
+			j=0
+			detail="\"${cargU}\"";
+			while [[ $((j)) -lt $((${nb_elem})) ]]; do
+				ic=$((${i_perm[$((j++))]} - 1))
+#				[[ "${table_elem}" = "compo" ]] && symb="${table_compo[$((${ic}))]}" || symb="${table_nec[$((${ic}))]}"
+				symb="${table_elem[$((${ic}))]}"
+				detail="${detail} ${symb}";
+				symb_hexa="${vh[${symb}]}";
+				${gbl_gen_symboles} && {
+# xkb n'admet pas de valeur hexadécimale dans les fichiers composes pour représenter les touches muettes
+					dead="dead_${vh[${symb_hexa}]}"
+					echo -n "<${dead}> ";
+				} || echo -n "<${symb_hexa}> ";
+				done;
+#			echo -e " <${symbU}> : \"${carg}\" ${codeU} # ${detail}\t\t## ucg ${gbl_date}"
+			echo "<${symbU}> : \"${carg}\" ${codeU} # ${detail}"
+			done ;
+		} ;
+###################################################
+# Création d'un fichier compose à partir de lignes de composition
+#################################################
+	function xcp_complemt {
+		declare -a p;
+		local fic_cps="$(tempfile --prefix="ucg_" --suffix=".txt")";
+		sup_nul "${1}" | sed -r "s/^(.*)$/xcp_perso \1/"> "${fic_cps}"
+		source "${fic_cps}" ;
+		rm 	"${fic_cps}" ;
+		return 0 ;
+	}
+	function xcp_perso {
+		local com;
+		while [[ $((${#@})) -gt 1 ]]; do
+			car="${1}" ; shift ;
+			elem="${vh[${car}]}"
+			[[ -z "${elem}" ]] && {
+				[[ ${#car} -eq 1 ]] && elem="$(unicode "${car}")" || {
+					[[ "${car}" = "cps" ]] && elem="Multi_key" || elem="${car}"; }
+				} ;
+			echo -n "<${elem}> ";
+			com="${com} \"${car}\"";
+			done ;
+		echo -n " : ";
+		com="${com} \"${1}\"";
+		elem="${1}"
+		[[ "${#elem}" -eq 1 ]] &&  echo -n "\"${elem}\" $(unicode "${elem}")";
+		[[ "${#elem}" -eq 5 ]] && 
+				[[ -z "$(echo "${elem}" | sed -r "s/^[u|U]?[[:xdigit:]]{4}$//")" ]] && echo -n "\"$(infos_unicode "${elem}" Symbole)\" ${elem}" || echo -n "\"${elem}\""; 
+		echo " # ${com}";
+	}
+####################################################
+# initialisation des variables baseU et cargU qui servent à construire les lignes en cours
+######################################################
+	function xcp_base {
+		baseU="${tab_alpha[":${lettre}:${dia_inclus}:"]}";
+		[[ -z "${baseU}" ]] && {
+			ligneU="$(grep --no-filename -e ":${lettre}:${dia_inclus}:" "${gbl_dir_alphabets}"/*.alp;)";
+			baseU="$(echo ${ligneU} | cut -d ":" -f 3)" ;
+			cargU="$(echo ${ligneU} | cut -d ":" -f 2)" ;
+			symbU="$(xcp_symbole ${baseU})";
+			tab_alpha[":${lettre}:${dia_inclus}:"]="${baseU}";
+			tab_carg[":${lettre}:${dia_inclus}:"]="${cargU}";
+			tab_symbol[":${lettre}:${dia_inclus}:"]="${symbU}";
+			} || {								
+			cargU="${tab_carg[":${lettre}:${dia_inclus}:"]}";
+			symbU="${tab_symbol[":${lettre}:${dia_inclus}:"]}";
+			} ;
+		} ;
+##############################################
+# Création des fichiers compose pour chaque bloc Unicode inséré dans l'alphabet
+##############################################
+	function xcompose {
+		local fic_xcp xcp_source;
+		[[ -z "${1}" ]] && fic_xcp="/dev/stdout" || fic_xcp="${1}";
+		[[ "${fic_xcp}" = "-" ]] && fic_xcp="/dev/stdout"
+		[[ -n "${2}" ]] && xcp_source="${2}" || xcp_source="grec polytonique" ;
+		local blocs_inclus="$(tempfile --prefix="ucg_" --suffix=".txt")";
+		local bloc carg codeU symbU codeh lettre liste_dia comment;
+		local permutation dia detail
+		declare -a indices_comb
+		declare -a indices_perm
+		declare -a table_multi
+		local alphabet="$(tempfile --prefix="ucg_" --suffix=".alp")";
+		
+# reprise localement des fonctions de traçage
+		function ev { ! ${gbl_test} && return; local ifs="${IFS}"; IFS="${gbl_ifs}"; for _ in "${@}"; do declare -p ${_} > /dev/stderr ; done ; IFS="${ifs}" ; } ;
+		function eb { local ifs="${IFS}"; IFS="${gbl_ifs}"; for _ in "${@}"; do echo -n -e "${_}=\"${!_}\";\t" ; done ; echo;  IFS="${ifs}" ; } ;
+
+###################################################
+# Composition des lignes avec fusion de diacritiques
+####################################################
+		function xcp_multi_dia {
+			local i dia_compo
+			i=0
+			dia_compo=
+			while [[ $((i)) -lt $((nb_dia_comp)) ]]; do
+				indice=$((${indices_perm[$((i++))]} - 1 ));
+#				dia_compo="${dia_compo}_${table_nec[$((indice))]}";
+				dia_compo="${dia_compo}+${table_nec[$((indice))]}";
+				done
+			dia_compo="${dia_compo:1}";
+#			dia_nec_compo="$(retirer "$(echo "${dia_compo}" | tr "_" " ")" "${dia_nec}") ${dia_compo}";
+			dia_nec_compo="$(retirer "$(echo "${dia_compo}" | tr "+" " ")" "${dia_nec}") ${dia_compo}";
+			unset table_compo
+			table_compo=($(echo ${dia_nec_compo};));
+			nb_compo=${#table_compo[*]};
+			ev symbU codeU
+			xcp_lignes "table_compo"
+			} ;
+###########################################
+# Enregistrement du fichier compose
+###########################################
+		function xcp_cps {
+			IFS=":";
+			while read bloc carg codeU codeh lettre liste_dia comment bloc; do
+# :Ά:U0386:ce-86:ALPHA:tonique:Lettre majuscule grecque Alpha accent:Grec et copte:
+				IFS="${gbl_ifs}";
+				ev carg codeU lettre liste_dia
+				[[ -z "${carg}${codeU}${codeh}" ]] && break;
+				tab_alpha[":${lettre}:${liste_dia}:"]="${codeU}";
+				tab_carg[":${lettre}:${liste_dia}:"]="${carg}";
+				tab_symbol[":${lettre}:${liste_dia}:"]="$(xcp_symbole ${codeU})";
+				unset table_dia
+				table_dia=($(echo ${liste_dia};));
+				nb_dia=${#table_dia[*]};
+				ev nb_dia
+				[[ $((nb_dia)) -gt 0 ]] && {
+					for indices_inclus in "" ${gbl_ind_comb[$((nb_dia))]}; do
+						ev indices_inclus
+						dia_inclus=
+						for i in $(echo ${indices_inclus} | tr "|" " "); do dia_inclus="${dia_inclus} ${table_dia[$((i-1))]}"; done
+						[[ "${dia_inclus:0:1}" = " " ]] && dia_inclus="${dia_inclus:1}"
+						dia_nec="$(retirer "${dia_inclus}" "${liste_dia}")"
+						table_nec=($(echo ${dia_nec};));
+						nb_nec=${#table_nec[*]};
+						ev liste_dia dia_inclus dia_nec
+						xcp_base ;
+						[[ -z "${baseU}" ]] &&  break  ;
+						ev carg baseU cargU symbU
+						ev symbU codeU
+						xcp_lignes "table_nec"
+	# composition des lignes pour les touches multi-diacritiques
+						for indices_nec in ${gbl_ind_comb[$((nb_nec))]}; do
+							unset indices_perm
+							indices_perm=($(echo ${indices_nec} | tr "|" " "));
+							nb_dia_comp="${#indices_perm[*]}";
+							ev indices_nec nb_dia_comp
+							[[ $((nb_dia_comp)) -ge 2 ]] && xcp_multi_dia
+							done
+						IFS="${gbl_ifs}"
+						done;
+					} ;
+				IFS=":" ;
+				done < "${alphabet}";
+			IFS="${gbl_ifs}";						
+		} ;
+		[[ "${xcp_source}" = "grec polytonique" ]] && {
+			touch "${alphabet}";
+			for bloc in "Grec et copte" "Grec étendu"; do
+				! [[ -a "${gbl_dir_alphabets}/${bloc}.alp" ]] && alphabet "${bloc}";
+				cat "${gbl_dir_alphabets}/${bloc}.alp" >> "${alphabet}";
+				done;
+#			cat "${gbl_dir_alphabets}"/*.alp >"${alphabet}";
+		}
+# sauvegarde fichier compose et suppression des lignes créées par xcompose
+		[[ -f "${fic_xcp}~" ]] && rm "${fic_xcp}~";
+		fic_sed="$(echo "$(basename "${xcp_source}")" | tr "[]{}^()" ".")";
+		[[ -f "${fic_xcp}" ]] && {
+			mv -T "${fic_xcp}" "${fic_xcp}~";
+			sed -r "/début ucg xcompose ${fic_sed}/,/fin ucg xcompose ${fic_sed}/d" "${fic_xcp}~" > "${fic_xcp}"
+			}
+		! [[ -e  "${fic_xcp}" ]] && touch "${fic_xcp}";
+		echo "## début ucg xcompose ${fic_sed} créé le ${gbl_date} -- ne pas supprimer cette ligne qui marque le début du fichier ${xcp_source}" >> "${fic_xcp}"
+		[[ "${xcp_source}" = "grec polytonique" ]] && xcp_cps >> "${fic_xcp}" || xcp_complemt "${xcp_source}"  >> "${fic_xcp}";
+		echo "## fin ucg xcompose ${fic_sed} créé le ${gbl_date} -- ne pas supprimer cette ligne qui marque la fin du fichier ${xcp_source}" >> "${fic_xcp}"
+		[[ "${fic_xcp}" = "/dev/stdout" ]] && return
+		! [[ -e "${gbl_compose}" ]] && {
+			mkdir -p "$(dirname "${gbl_compose}")" ;
+			echo "include \"%L\"" > "${gbl_compose}" ;
+			}
+		fic_sed=$(echo "${fic_xcp}" | tr "[]{}^():/" ".");
+		! grep -qe "${fic_sed}" "${gbl_compose}" && {
+			echo "include \"${fic_xcp}\"" >> "${gbl_compose}" ;
+			annonce informer "Le fichier \"${gbl_compose}\"a été mis à jour" "Création du fichier xcompose"
+		}
+		sudo rm /var/lib/xkb/*.xkm 2>/dev/null ;
+		rm /tmp/ucg_* 2>/dev/null ;
+		}
+		
+#####################################################
+# Recherche de la valeur hexadécimale d'un symbole muet
+#####################################################
+
+		function trad_symb {
+		local sm="${1}" ;
+		local symb="${vh[${sm}]}"
+		[[ -n "${symb}" ]] && echo "${symb}" || echo "symbole inconnu";
+		}
+
+#####################################################
+# Calcul du code Unicode du caractère
+###################################################
+	function unicode {
+		local car="${1}"
+		local ubin="";
+		local  j ;
+		local octets="$(echo -n ${car} | xxd -b | sed -r "s/[[:xdigit:]]+:(([[:space:]][01]{8})*).*$/\1/")"
+#		echo "${octets}" ;
+		for octet in $(echo ${octets} ); do
+			j=0
+			until [[ "${octet:$((j++)):1}" = "0" ]] ; do : ; done;
+			while [[ $((j)) -le 7 ]] ; do ubin="${ubin}${octet:$((j++)):1}"; done ;
+#			echo "${ubin}"
+			done ;
+		[[ $((${#ubin})) -lt 16 ]] && nbz=$((16 - ${#ubin})) || nbz=$(( 8 - ${#ubin} % 8)) ;
+		while [[ $((nbz--)) -gt 0 ]]; do ubin="0${ubin}" ; done ;
+		ubin=$((2#${ubin}));
+		printf -v codeu "%04x" ${ubin} ;
+		echo -n "U${codeu^^}" ;
+		}
+#####################################################
+# Affichage du caractère représenté par son code Unicode Uxxxx
+###################################################
+	function infos_unicode {
+		local car="${1}"
+		local quelle_info="${2:-"toutes"}"
+		local infos
+		[[ $((${#car})) -eq 1 ]] && car="$(unicode "${car}")";
+		infos="$(alp_wget "${car:1}" | grep -E "<meta[[:space:]]+name.*description" | xmlstarlet sel -t -m "//meta[@name='description']" -v ./@content)" ;
+		case "${quelle_info}" in
+			toutes) annonce "informer" "$(echo "${infos}" | sed -r "s/, /,/g" | tr "," "\n"; echo)" "Nom du caractère ${car}" ;;
+			*) echo "${infos}" | sed -r "s/^.*${quelle_info}: ([^,|$]+).*$/\1/" ;;
+			esac
+#		annonce "informer" "$(alp_wget "${car:1}" | grep -E "<meta[[:space:]]+name.*description" | xmlstarlet sel -t -m "//meta[@name='description']" -v ./@content | sed -r "s/, /,/g" | tr "," "\n"; echo)" "Nom du caractère ${car}"
+	}
+
+##########################################
+# Purge des fichiers compilés par xkb
+##########################################		
+	function cla_xkb_purge {
+		local ctrl=${1:-false}
+		${ctrl} && ls /var/lib/xkb ;
+		sudo rm /var/lib/xkb/*.xkm &>/tmp/xkb.log
+		${ctrl} && ls /var/lib/xkb ;
+	}
+####################################################
+#
+# Création et enregistrement clavier
+#
+##################################################
+############################################
+# Mise à jour du fichier evdev.xml
+#############################################
+	function cla_maj_evdev {
+		local evdev fic_layout
+		function cla_nv_variant {
+			echo " <variant>"
+			echo "  <configItem>"
+			echo "     <name>${ident[symbol]}</name>"
+			echo "     <shortDescription>${ident[sigle]}</shortDescription>"
+			echo "     <description>${ident[clavier]}</description>"
+			echo "   </configItem>"
+			echo "  </variant>"
+		}
+		fic_layout="$(tempfile --prefix="cla_" --suffix=".xml")" ;
+		cla_nv_variant > "${fic_layout}" ;
+		evdev="$(cat "${gbl_dir_gnu}/evdev.xml" | xmlstarlet ed -d "//variantList/variant[../.././configItem/name='${ident[xkb]}' and ./configItem/name='${ident[symbol]}']" -s "//variantList[.././configItem/name='${ident[xkb]}']" -t elem -n nouvariant | sed  -r "s|<nouvariant/>|cat "${fic_layout}"|e")" ;
+		[[ "${?}" = 0 ]] && echo "${evdev}" | xmlstarlet fo -s 1 -e utf-8 - > "${gbl_dir_gnu}/evdev.xml"
+		rm "${fic_layout}";
+		}
+############################################
+# Recherche des caractéristiques du clavier dans evdev.xml
+############################################
+	function cla_ident {
+		local type="${1}";
+		local nom_fr="${2}";
+		local nom_cla_evdev
+		nom_cla_evdev="$(xmlstarlet sel -t -m "//description[ . = '${nom_fr}']" -v "." "${gbl_evdev_xml}"  2>/dev/null)";
+		[[ -z "${nom_cla_evdev}" ]] && {
+			while read nom; do [[ "$(gettext "${nom}")" = "${nom_fr}" ]] && { nom_cla_evdev="${nom}"; break; } ; done <<< "$(xmlstarlet sel -t -m "//description" -v "." -n "${gbl_evdev_xml}"  2>/dev/null)" ; }
+		[[ -z "${nom_cla_evdev}" ]] && case "${type}" in
+			"base") return 1;;
+			"clavier") return 0;;
+			esac;
+		noeud="$(xmlstarlet sel -t -c "//layout[.//description = '${nom_cla_evdev}']"  2>/dev/null "${gbl_evdev_xml}")" ;
+		base="$(echo "${noeud}" | xmlstarlet sel -t -m "/layout/configItem/name" -v ".")";
+		[[ -z "${ident[xkb]}" ]] && ident[xkb]="${base}";
+		[[ "${type}" = "base" ]] && { 
+			ident[base]="${base}""(""$(echo "${noeud}" | xmlstarlet sel -t -m "//configItem[description= '${nom_cla_evdev}']" -v "./name")"")" ; return 0 ; }
+		filtre="$(echo ${nom_fr} | tr "()[]/" ".")";
+		! [[ "$(grep -E -c "ucg \"${filtre}\"" "${gbl_dir_symbols}/${base}")" = "2" ]] && return 2;
+		element="$(echo "${noeud}" | xmlstarlet sel -t -c "/layout//configItem[description = '${nom_cla_evdev}']")";
+#		ident[xkb]="$(echo "${noeud}" | xmlstarlet sel -t -m "/layout/configItem/name" -v ".")";
+		[[ -z "${ident[sigle]}" ]] && ident[sigle]="$(echo "${noeud}" | xmlstarlet sel -t -m "/layout/configItem/shortDescription" -v ".")"
+		ident[symbol]="$(echo "${element}" | xmlstarlet sel -t -m "//name" -v ".")";
+		return 0;
+	}
+###############################################
+# Analyse de la ligne de déclaration du clavier
+############################################
+	function cla_analyse_dec {
+		local fic_clavier="$(tempfile --prefix="cla_" --suffix=".tmp")" ;
+		declare -a mots
+		declare -A mot_cle
+		declare -gA ligne
+		ident[lecture]="${1}";
+		[[ -n "${1}" ]] &&  sup_com  "${ident[lecture]}" > "${fic_clavier}" || cat /dev/null > "${fic_clavier}" ;
+		read -a mots <<< "$(grep -E "(clavier|base|sigle)" "${fic_clavier}")" ;
+		for cle in clavier sigle base; do mot_cle[${cle}]="mot clef"; done ;
+		i=0;
+		while [[ $((i)) -lt $((${#mots})) ]]; do
+				mot="${mots[(($((i++))))]}";
+				mot="$(extraction "${mot}")"
+				echo "mot=${mot}"
+				echo "mot_cle=${mot_cle[${mot}]}"
+				[[ -n "${mot_cle[${mot}]}" ]] && id="${mot}" && ident[${id}]="" || ident[${id}]="${ident[${id}]} ${mot}" ;
+				echo "${ident[${id}]}"
+				done;		
+		for cle in clavier sigle base; do ident[${cle}]="$(echo "${ident[${cle}]}" | sed -r "s/^[[:space:]]*//")"; done; 
+
+	} ;
+####################################################
+# Calcul du nom du fichier clavier
+###################################################
+	function cla_fichier {
+		declare -A mot_cle
+		declare -A param_fic
+		local cle id
+		local fic_source
+		[[ -z "${ident[lecture]}" ]] && fic_source="/dev/stdin" || fic_source="${ident[lecture]}" ;
+		bases="$(while read un_msg; do gettext "${un_msg}"; echo; done <<< "$(cat ${gbl_evdev_xml} | xmlstarlet sel -t -m "//layout/variantList/variant/configItem/description" -v "." -n 2>/dev/null)" | sort | tr "\n" "|"; )"
+		bases="|${bases}"
+		! param="$(yad --form --title="ucg : création de clavier" --button="gtk-ok:0"  --button=Annuler:1 \
+			--width=900 --item-separator="|" --separator="|" \
+			--always-print-result --sticky --center \
+			--field="Clavier à modifier ou clavier de base, cependant optionnel, pour la création d'un nouveau clavier:CB" \
+			--field="Le choix d'un clavier de base permet de limiter le fichier de description du clavier aux seules touches qui en diffèrent.:LBL" \
+			--field="Nom du clavier à créer (ne pas renseigner s'il s'agit de la modification du clavier sélectionné ci-dessus)" \
+			--field="Fichier de description du clavier:FL" \
+			--field="Indicateur pour caractériser le clavier (les seules trois premières lettres sont retenues)" \
+			--field="L'indicateur ci-dessus permet de caractériser le clavier dans le menu «source de saisie» de la zone des indicateurs de la barre de menu. Par défaut «ucg» ou, le cas échéant, celui du clavier de base, :LBL" \
+			"${bases}" "" ""  "${fic_source}" "ucg" "" 2>/dev/null)" && { gbl_erreur="Arrêt à la demande de l'utilisateur" && return 1; };
+		ident[base]="$(echo "${param}" | cut -d "|" -f 1)";
+		ident[clavier]="$(echo "${param}" | cut -d "|" -f 3)";
+		ident[sigle]="$(echo "${param}" | cut -d "|" -f 5 | cut -d " " -f 1 | sed -r "s/[[:space:]]*([^[:space:]]{,3}).*/\1/")";
+		ident[lecture]="$(echo "${param}" | cut -d "|" -f 4)";
+		[[ -z "${ident[clavier]}" ]] && ident[clavier]="${ident[base]}" && ident[base]="";
+		[[ -n "${ident[clavier]}" ]] && {
+			cla_ident clavier "${ident[clavier]}" || {
+				gbl_erreur="Le clavier \"${ident[clavier]}\" n'a apparemment pas été créé par cette procédure. Il ne peut être mis à jour. Cependant il peut servir de base à la création d'un nouveau fichier."
+				return 1;
+				}
+			}
+		[[ -n "${ident[base]}" ]] && {
+			cla_ident base "${ident[base]}" || \
+				{ gbl_erreur="Le clavier \"${ident[base]}\" est inconnu. La création du clavier est impossible"
+				return 1;
+				}
+		}
+		[[ -z "${ident[xkb]}" ]] && ident[xkb]="${gbl_lg_tlstr}";
+		[[ -z "${ident[sigle]}" ]] && ident[sigle]="ucg";
+		[[ -z "${ident[clavier]}" ]] && ident[sortie]="/dev/stdout" || {
+			ident[sortie]="${gbl_dir_gnu}/${ident[xkb]}";
+			msg="Création ou modification du clavier \"${ident[clavier]}\" ?"
+			annonce "questionner" "$msg" "ucg : création de clavier" || {
+				gbl_erreur="Arrêt à la demande de l'utilisateur"
+				return 1;
+			}
+		}
+	}
+##########################################
+# Création de chaque ligne de définition d'une touche du clavier
+##########################################
+
+# pour la création d'un fichier clavier.ucg à partir d'un fichier clavier.xkb
+# sed -r "s|^[[:space:]]*key[[:space:]]*<([[:alnum:]]+)[^;]+;[[:space:]]*//(.*)$|\1 \2|" clavier.xkb >/clavier.ucg
+	function cla_touche {
+		local key="${1}"
+		local commentaire="// ";
+		local mode
+#		key="$(echo "${key}" | sed -r "s/^[^[:alnum:]]*([[:alnum:]]{4}).*$/\1/")";
+		key="$(echo "${key}" | cut -d " " -f 1)"
+		case "$(echo "${key}" | cut -d "-" -f 2)" in
+			"½a") mode="type[group1] = \"FOUR_LEVEL_SEMIALPHABETIC\"," ;;
+			esac
+		key="$(echo "${key}" | cut -d "-" -f 1)"
+		shift
+		ent_acc=""
+		while [[ $((${#})) -gt 0 ]]; do
+			car="$(extraction "${1}")"; shift ;
+			[[ $((${#car})) -gt 1 ]] && {
+# la reconnaissance des muettes multiples se fait par la présence de "+" dans le libellé ; puis classement alphabétique
+				ncar="$(echo -n "${car}" | grep "+" | tr "+" "\n" | sort | tr "\n" "+" | sed -r s"/(.*).$/\1/")";
+				[[ -n "${ncar}" ]] && car="${ncar}" ;   # en l'absence de "+", ncar est vide
+				case "${car}" in
+#					"cps") ent_acc=", type[Group1]=\"ONE_LEVEL\",	symbols[Group1] = [ Multi_key] ";;
+					"()" | "[]" ) ent_acc="${ent_acc}, VoidSymbol" ; commentaire="${commentaire} (vide)" ;;
+					"(.)" | "[.]") ent_acc="${ent_acc}, NoSymbol" ; commentaire="${commentaire} (valeur précédemment définie)" ;;
+					* ) [[ "$(echo "${car}" | sed -r "s/^(.{2}).*$/\1/")" = "0x" ]] && car="${vh[${car}]}";
+						commentaire="${commentaire} ${car}";
+						car="$(echo "${car}" | sed -r "s/^dead_//")" ; # retrait de "dead_" si présent
+						ncar="${vh[${car}]}" ; # traduction éventuelle en hexa du symbole ucg ou xkb
+						[[ -z "${ncar}" ]] && ent_acc="${ent_acc}, ${car}" || ent_acc="${ent_acc}, ${ncar}" ;
+					esac ;
+				} || {
+					ent_acc="${ent_acc}, $(unicode ${car})";
+					commentaire="${commentaire} \"${car}\"";
+					}
+			done;
+			ent_acc=" [ ${ent_acc:1} ] "
+			echo "key <${key}> { ${mode} ${ent_acc} } ; ${commentaire}"
+		}	
+		
+	function clavier {
+# un lien symbolique vers le fichier des claviers (par exemple "fr") est créé dans le répertoire ${gbl_dir_symbols},
+# et le fichier "${gbl_evdev_xml}" est recopié dans ${gbl_dir_gnu} sous le nom evdev.xml, et mis à jour. 
+		local clav_temp="$(tempfile --prefix="cla_" --suffix=".xkb")" ;
+		local nom_evdev
+
+############################################
+# Création de l'entête du clavier
+############################################
+		function cla_prologue {
+			local identification mot
+			identification=
+			for mot in clavier sigle; do [[ -n "${ident[${mot}]}" ]] && identification="${identification} ${mot} \"${ident[${mot}]}\""; done;
+			echo "// début ucg \"${ident[clavier]}\" créé le ${gbl_date} -- ne pas supprimer cette ligne qui marque le début du clavier";
+#			echo "// ${identification}"
+			echo "partial alphanumeric_keys alternate_group"
+			echo "xkb_symbols \"${ident[symbol]}\" {"
+			[[ -n "${ident[base]}" ]] && echo "include \"${ident[base]}\""
+			[[ -n "${ident[clavier]}" ]] && echo "name[Group1] = \"${ident[clavier]}\";";
+			echo "include \"level3(lalt_switch)\""
+			echo "include \"level3(ralt_switch)\"";		
+			return 0;
+		}
+############################################
+# Création de la fin du fichier
+############################################
+		function cla_epilogue {
+			echo "};";
+			echo "// fin ucg \"${ident[clavier]}\" -- ne pas supprimer cette ligne qui marque la fin du clavier";
+		}
+# procédure principale
+		local fic_clavier="$(tempfile --prefix="cla_" --suffix=".tmp")" ;
+		local fic_xkb ;
+		local cr
+		gbl_erreur=""
+		ident[lecture]="${1}";
+#		[[ -n "${1}" ]] &&  sup_com  "${ident[lecture]}" > "${fic_clavier}" || cat /dev/null > "${fic_clavier}" ;
+#		eval "cla_fichier $(grep -E "(clavier|base|sigle)" "${fic_clavier}")"
+		cla_fichier
+		[[ -n "${gbl_erreur}" ]] && {
+			annonce "notifier" "${gbl_erreur}" "ucg : création de clavier";
+			return 1;
+		}
+		[[ -n "${ident[lecture]}" ]] && sup_com  "${ident[lecture]}" > "${fic_clavier}" ;
+		[[ "${ident[sortie]}" = "/dev/stdout" ]] && fic_xkb="/dev/stdout" || {
+			[[ -e "${gbl_dir_gnu}/${ident[xkb]}" ]] && [[ -e "${gbl_dir_symbols}/${ident[xkb]}" ]] && ! [[ "${gbl_dir_gnu}/${ident[xkb]}" -ef "${gbl_dir_symbols}/${ident[xkb]}" ]] && 
+				{ fichiers_xkb="es fichiers\n\"${gbl_dir_gnu}/${ident[xkb]}\" et \"${gbl_dir_symbols}/${ident[xkb]}\""
+					}
+			[[ -e "${gbl_dir_gnu}/evdev.xml" ]] && [[ -e "${gbl_evdev_xml}" ]] && ! [[ "${gbl_dir_gnu}/evdev.xml" -ef "${gbl_evdev_xml}" ]] && 
+				{ fichiers_evdev="es fichiers\n\"${gbl_dir_gnu}/evdev.xml\" et \"${gbl_evdev_xml}\""
+				}
+			[[ -n "${fichiers_xkb}${fichiers_evdev}" ]] && {
+				[[ -n "${fichiers_xkb}" ]] && [[ -n "${fichiers_evdev}" ]] && msg="L${fichiers_xkb}, d'une part,\net l${fichiers_evdev}, d'autre part," || msg="L${fichiers_xkb}${fichiers_evdev}" ;
+				msg="${msg}\ndevraient désigner le même fichier physique, ce qui n'est pas le cas.\nLa commande risque de ne pas fonctionner et même de produire des effets indésirables.\nIl convient d'analyser la situation et d'y remédier";
+				annonce "informer" "${msg}" "ucg : création de clavier";
+				return 1;
+				}
+# recherche du symbole par analyse des symboles "ident[sigle*]" existants
+			[[ -z "${ident[symbol]}" ]] && {
+				fic=0
+				ln="<noms>$(cat "${gbl_evdev_xml}" | xmlstarlet sel -t -c "//layout/configItem/name[ . = '${ident[xkb]}' ]/../../variantList/variant//name" 2>/dev/null)</noms>"
+				while  xmlstarlet sel -t -c "/noms/name[ . = '${ident[sigle]}$((++fic))' ]" 1>/dev/null <<< "$(echo "${ln}")"; do : ; done;
+				ident[symbol]="${ident[sigle]}${fic}" ; }
+			fic_xkb="${gbl_dir_gnu}/${ident[xkb]}" ;
+			! [[ -e "${fic_xkb}" ]] && {
+				cp -T "${gbl_dir_symbols}/${ident[xkb]}" "${fic_xkb}" ;
+				sudo mv -T "${gbl_dir_symbols}/${ident[xkb]}" "${gbl_dir_symbols}/.${ident[xkb]}" ;
+				sudo ln -s -T  "${fic_xkb}" "${gbl_dir_symbols}/${ident[xkb]}";
+				ln -s -T "${gbl_dir_symbols}/.${ident[xkb]}" "${fic_xkb}.original" ;
+				chown root:root "${fic_xkb}.original" ;
+				}
+			! [[ -e "${gbl_dir_gnu}/evdev.xml" ]] && {
+				cp -T "${gbl_evdev_xml}" "${gbl_dir_gnu}/evdev.xml"
+				sudo mv -T "${gbl_evdev_xml}" "$(dirname ${gbl_evdev_xml})/.evdev.xml"
+				sudo ln -s -T "${gbl_dir_gnu}/evdev.xml" "$(dirname ${gbl_evdev_xml})/evdev.xml" ;
+				ln -s -T "$(dirname ${gbl_evdev_xml})/.evdev.xml" "${gbl_dir_gnu}/evdev.xml.original"
+				chown root:root "${gbl_dir_gnu}/evdev.xml.original" ;
+				}
+			filtre="$(echo "ucg .${ident[clavier]}" | tr "()[]/" ".")";
+			sed -i~ -e "\|début ${filtre}|,\|// fin ${filtre}|d" "${fic_xkb}";
+			}
+#		for elem in symbol clavier lecture base sigle xkb sortie; do echo "${elem} = ${ident[${elem}]}"; done;
+		cla_prologue >> "${fic_xkb}"
+# pour éviter le développement du "*" 
+		set -f
+		grep -v -E "(clavier|base|langue|sigle)" "${fic_clavier}" | while read cde arguments; do
+			ev cde arguments
+			cla_touche "${cde}" ${arguments} >> "${fic_xkb}"
+			done ;			
+		set +f
+#		rm "${fic_clavier}"
+		cla_epilogue >>  "${fic_xkb}";
+		[[ "${ident[sortie]}" = "/dev/stdout" ]] && return 0;
+
+#		sudo ln -fs -T "${ident[fichier]}" "${gbl_dir_symbols}/${ident[xkb]}"
+# mise à jour du fichier evdev.xml
+#	grep -oE "^[^[[:space:]]*" <<< "$(grep -e "${gbl_evdev_xml}" /etc/fstab)"
+		cla_maj_evdev
+#		! grep -qe "<description>${ident[clavier]}</description>" "${gbl_evdev_xml}" && {
+#			local fic_layout="$(tempfile --prefix="cla_" --suffix=".xml")" ;
+#			cla_maj_evdev > "${fic_layout}" ;
+#			sudo sed -i -r "s|</layoutList>|cat "${fic_layout}"|e" "${gbl_evdev_xml}" ; }
+		[[ "${?}" = "0" ]] && {
+			msg="Le clavier \"$(basename "${ident[clavier]}")\" a été correctement installé dans le système. Pour l'activer, il est probable qu'il faille redémarrer."
+			annonce "informer" "${msg}" "Ucg : création de claviers";
+			}
+		}
+
+######################################################################
+# Extraction du nœud evdev.xml pour un pays
+#####################################################################
+	function cla_pays {
+		local evdev clavier code_pays pays_crt noeud_pays pays_xml
+		function trait_nv_pays {
+				noeud_pays="//layout/configItem/name[.='${code_pays}']";
+				pays_crt="${code_pays}";
+				pays_xml="<ucg>$(xmlstarlet sel -t -m "${noeud_pays}" -c "../.." <<< "${evdev}")</ucg>" ;
+				[[ "${pays_xml}" = "<ucg></ucg>" ]] && traitement=false || traitement=true ;
+				return 0 ;
+				}
+		evdev="$(cat ${gbl_evdev_xml} | xmlstarlet sel -t -m "//layoutList" -c "." )" 
+		cd "${gbl_dir_symbols}";
+		pays_crt=""
+		for clavier in $(grep "xkb_symbols" $(ls -F1 | grep -vE "\/$" | tr "\n" " " ) );
+			do
+			code_pays="$(echo "${clavier}" | cut -d ":" -f 1)";
+			[[ "${code_pays}" != "${pays_crt}" ]] && nv_pays;
+			code_clavier="$(echo "${clavier}" | cut -d "\"" -f 2)" ;
+			
+			done;
+		}
+
+	
+# /usr/share/X11/xkb/symbols$ grep -e "xkb_symbols" $(ls -F1 | grep -vE ".*\/$" | tr "\n" " ")
+# grep -m 1 -e "xkb_symbols" $(ls -F1 | grep -vE ".*\/$" | tr "\n" " ") | cut -d ":" -f 1
+######################################################################
+# Enregistrement du fichier de description du clavier
+#####################################################################
+	function cla_param {
+		local fic_source
+		[[ -z "${ident[lecture]}" ]] && fic_source="/dev/stdin" || fic_source="${ident[lecture]}" ;
+		bases="$(while read un_msg; do gettext "${un_msg}"; echo; done <<< "$(cat ${gbl_evdev_xml} | xmlstarlet sel -t -m "//layout/variantList/variant/configItem/description" -v "." -n 2>/dev/null)" | sort | tr "\n" "|"; )"
+		bases="|${bases}"
+		! param="$(yad --form --title="ucg : Création d'un clavier" --button="gtk-ok:0"  --button=Annuler:1 \
+			--width=900 --item-separator="|" --separator="|" \
+			--always-print-result --sticky --center \
+			--field="Clavier à modifier ou clavier de base, cependant optionnel, pour la création d'un nouveau clavier:CB" \
+			--field="Le choix d'un clavier de base permet de limiter le fichier de description du clavier aux seules touches qui en diffèrent.:LBL" \
+			--field="Nom du clavier à créer (ne pas renseigner s'il s'agit de la modification du clavier sélectionné ci-dessus)" \
+			--field="Fichier de description du clavier:FL" \
+			--field="Indicateur pour caractériser le clavier (les seuls trois premières lettres sont retenues)" \
+			--field="L'indicateur ci-dessus permet de caractériser le clavier dans le menu «source de saisie» de la zone des indicateurs de la barre de menu. Par défaut «ucg» ou, le cas échéant, celui du clavier de base, :LBL" \
+			"${bases}" "" ""  "${fic_source}" "ucg" "" 2>/dev/null)" && { gbl_erreur="Arrêt à la demande de l'utilisateur" && return 1; };
+		ident[base]="$(echo "${param}" | cut -d "|" -f 1)";
+		ident[clavier]="$(echo "${param}" | cut -d "|" -f 3)";
+		ident[sigle]="$(echo "${param}" | cut -d "|" -f 5 | cut -d " " -f 1)";
+		ident[lecture]="$(echo "${param}" | cut -d "|" -f 4)";
+		[[ -z "${ident[clavier]}" ]] && ident[clavier]="${ident[base]}" && ident[base]="";
+}
+##########################################################################
+# Traduction des symboles morts en valeurs hexadécimales dans le fichier de définition du clavier
+# Le fichier de définition du clavier doit être présenté sur l'entrée standard
+# echo "key <AB01> { [ Greek_omega,		Greek_OMEGA,	dead_acute,	dead_aigu_iota   ] }; // ω Ω acute aigu" | ucg cla_trad
+# donne
+# key <AB01> { [ Greek_omega,Greek_OMEGA, 0xfe51 , 0xfe5a    ] }; // ω Ω acute aigu
+###########################################################################
+	function cla_trad {
+		local deb_ligne="${1}";
+		local sym_muet="${2}";
+		local fin_ligne="${3}";
+		local val_hexa;
+		local fic="$(tempfile --prefix="ucg_" --suffix=".sed")";
+		[[ $((${#})) -eq 0 ]] && cat >"${fic}" || {
+			val_hexa="$(trad_symb ${sym_muet})" ;
+			echo "${deb_ligne} ${val_hexa} ${fin_ligne}" > "${fic}" ;
+			}
+		sed -r "s|^(.*)dead_([[:alnum:]_]+)(.*)$|${gbl_script} cla_trad \"\1\" \2 \"\3\"|e" < "${fic}";
+		rm "${fic}";
+	} ;
+###########################################################################
+# Remplacement des caractères grecs modernes et du ; par leurs correspondants en grec ancien
+###########################################################################
+	function polytonique {
+		local deb_ligne="${1}";
+		[[ -z "${deb_ligne}" ]] && deb_ligne="/dev/stdin";
+		local moderne="${2}";
+		local fin_ligne="${3}";
+		declare -A ltr=([Ά]=Ά [Έ]=Έ [Ή]=Ή [Ί]=Ί [Ό]=Ό [Ύ]=Ύ [Ώ]=Ώ [ά]=ά [έ]=έ [ή]=ή [ί]=ί [ό]=ό [ύ]=ύ [ώ]=ώ [;]=";")
+		local fic="$(tempfile --prefix="ucg_" --suffix=".sed")";
+		[[ $((${#})) -eq 0 ]] && cat >"${fic}" || echo "${deb_ligne}${ltr[${moderne}]}${fin_ligne}" > "${fic}" ;
+		sed -r "s|^(.*)([;|Ί|Έ|Ή|Ύ|Ώ|Ό|Ά|ύ|ό|ώ|ή|ί|ά|έ])(.*)$|${gbl_script} polytonique \"\1\" \2 \"\3\"|e" < "${fic}" ;
+		rm "${fic}";
+	} ;
+###########################################################################
+# Remplacement des caractères grecs modernes et du ; par leurs correspondants en grec ancien
+###########################################################################
+	function normal_ligne {
+		local fin_ligne="${1}";
+		local moderne="${2}" ;
+		local deb_ligne="${3}";
+		local sauf_modernes une_moderne
+		declare -A ltr=([Ά]=Ά [Έ]=Έ [Ή]=Ή [Ί]=Ί [Ό]=Ό [Ύ]=Ύ [Ώ]=Ώ [ά]=ά [έ]=έ [ή]=ή [ί]=ί [ό]=ό [ύ]=ύ [ώ]=ώ [;]=";")
+		sauf_modernes="$(echo -n "${!ltr[@]}" | tr -d " ")"
+		une_moderne="$(echo -n "${!ltr[@]}" | tr " " "|")"
+		[[ -n "${deb_ligne}" ]] && echo -n "${deb_ligne}" ;
+		[[ -n "${moderne}" ]] && echo -n "${ltr[${moderne}]}";
+		[[ -n "${fin_ligne}" ]] && echo -n "${fin_ligne}" | sed -r "s|^([^${sauf_modernes}]*)([${une_moderne}])(.*)$|${gbl_script} normal_ligne \"\3\" \"\2\" \"\1\"|e" ;
+	} ;
+	function normalise {
+		local fic="${1:-/dev/stdin}"
+		while read ligne; do normal_ligne "${ligne}" ; echo ; done < "${fic}" ;
+		return 0
+	}
+		
+	init_gbl
+# ces déclarations doivent être sorties des fonctions, car elles ne pourraient y être définies que localement.
+	declare -A vh ; # contient les valeurs hexadécimales des points de code
+	declare -A us ; # contient les valeurs hexadécimales des symboles
+	declare -A ident ;
+	declare -a table_dia
+	declare -a table_nec
+	declare -a table_compo
+	declare -A tab_alpha tab_carg tab_symbol
+	declare -A vh=( \
+	[0xfe50]="grave" \
+	[0xfe51]="acute" \
+	[0xfe52]="circumflex" \
+	[0xfe53]="perispomeni" \
+	[0xfe54]="macron" \
+	[0xfe55]="brève" \
+	[0xfe56]="abovedot" \
+	[0xfe57]="iota" \
+	[0xfe58]="abovering" \
+	[0xfe59]="doubleacute" \
+	[0xfe5a]="caron" \
+	[0xfe5b]="cedilla" \
+	[0xfe5c]="ogonek" \
+	[0xfe5d]="iota" \
+	[0xfe5e]="voiced_sound" \
+	[0xfe5f]="semivoiced_sound" \
+	[0xfe60]="belowdot" \
+	[0xfe61]="hook" \
+	[0xfe62]="horn" \
+	[0xfe63]="stroke" \
+	[0xfe64]="psili" \
+	[0xfe65]="dasia" \
+	[0xfe66]="doublegrave" \
+	[0xfe67]="belowring" \
+	[0xfe68]="belowmacron" \
+	[0xfe69]="belowcircumflex" \
+	[0xfe6a]="belowtilde" \
+	[0xfe6b]="belowbreve" \
+	[0xfe6c]="belowdiaeresis" \
+	[0xfe6d]="invertedbreve" \
+	[0xfe6e]="belowcomma" \
+	[0xfe6f]="currency" \
+	[0xfe90]="lowline" \
+	[0xfe91]="aboveverticalline" \
+	[0xfe92]="belowverticalline" \
+	[0xfe93]="longsolidusoverlay" \
+	[0xfe80]="a" \
+	[0xfe81]="A" \
+	[0xfe82]="e" \
+	[0xfe83]="E" \
+	[0xfe84]="i" \
+	[0xfe85]="I" \
+	[0xfe86]="o" \
+	[0xfe87]="O" \
+	[0xfe88]="u" \
+	[0xfe89]="U" \
+	[0xfe8a]="small_schwa" \
+	[0xfe8b]="capital_schwa" \
+	[0xfe8c]="greek" \
+	[grave]="0xfe50" \
+	[acute]="0xfe51" \
+	[circumflex]="0xfe52" \
+	[perispomeni]="0xfe53" \
+	[tilde]="0xfe53" \
+	[macron]="0xfe54" \
+	[brève]="0xfe55" \
+	[abovedot]="0xfe56" \
+	[diaeresis]="0xfe57" \
+	[abovering]="0xfe58" \
+	[doubleacute]="0xfe59" \
+	[caron]="0xfe5a" \
+	[cedilla]="0xfe5b" \
+	[ogonek]="0xfe5c" \
+	[iota]="0xfe5d" \
+	[voiced_sound]="0xfe5e" \
+	[semivoiced_sound]="0xfe5f" \
+	[belowdot]="0xfe60" \
+	[hook]="0xfe61" \
+	[horn]="0xfe62" \
+	[stroke]="0xfe63" \
+	[abovecomma]="0xfe64" \
+	[coronis]="0xfe64" \
+	[psili]="0xfe64" \
+	[abovereversedcomma]="0xfe65" \
+	[dasia]="0xfe65" \
+	[doublegrave]="0xfe66" \
+	[belowring]="0xfe67" \
+	[belowmacron]="0xfe68" \
+	[belowcircumflex]="0xfe69" \
+	[belowtilde]="0xfe6a" \
+	[belowbreve]="0xfe6b" \
+	[belowdiaeresis]="0xfe6c" \
+	[invertedbreve]="0xfe6d" \
+	[belowcomma]="0xfe6e" \
+	[currency]="0xfe6f" \
+	[a]="0xfe80" \
+	[A]="0xfe81" \
+	[e]="0xfe82" \
+	[E]="0xfe83" \
+	[i]="0xfe84" \
+	[I]="0xfe85" \
+	[o]="0xfe86" \
+	[O]="0xfe87" \
+	[u]="0xfe88" \
+	[U]="0xfe89" \
+	[small_schwa]="0xfe8a" \
+	[capital_schwa]="0xfe8b" \
+	[greek]="0xfe8c" \
+	[lowline]="0xfe90" \
+	[aboveverticalline]="0xfe91" \
+	[belowverticalline]="0xfe92" \
+	[longsolidusoverlay]="0xfe93" \
+		[tonique]="0xfe51" \
+		[circonflexe]="0xfe52" \
+		[iota]="0xfe57" \
+		[tréma]="0xfe57" \
+		[aigu+doux]="0xfe58" \
+		[aigu+rude]="0xfe59" \
+		[aigu+iota]="0xfe5a" \
+		[aigu+tréma]="0xfe5b" \
+		[circonflexe+doux]="0xfe5c" \
+		[circonflexe+rude]="0xfe5e" \
+		[circonflexe+iota]="0xfe5f" \
+		[circonflexe+tréma]="0xfe60" \
+		[doux+grave]="0xfe61" \
+		[grave+iota]="0xfe62" \
+		[doux+iota]="0xfe63" \
+		[doux]="0xfe64" \
+		[rude]="0xfe65" \
+		[iota+rude]="0xfe66" \
+		[grave+rude]="0xfe67" \
+		[circonflexe+doux+iota]="0xfe68" \
+		[doux+grave+iota]="0xfe69" \
+		[circonflexe+iota+rude]="0xfe6a" \
+		[grave+iota+rude]="0xfe6b" \
+		[aigu+doux+iota]="0xfe6c" \
+		[aigu+iota+rude]="0xfe6d" \
+		[grave+tréma]="0xfe6e" \
+		[tonique+tréma]="0xfe6f" \
+		[aigu]="0xfe80" \
+		);
+
+	declare -ra gbl_ind_comb=( \
+			"" \
+			"1"\
+			"1  1|2 2"\
+			"1  1|2 1|2|3 1|3 2  2|3 3"\
+			"1  1|2 1|2|3 1|2|3|4 1|2|4 1|3 1|3|4 1|4 2  2|3 2|3|4 2|4 3  3|4 4");
+	declare -ra gbl_ind_perm=("" \
+			"1"\
+			"1|2 2|1"\
+			"1|2|3 2|3|1 2|1|3 1|3|2 3|2|1 3|1|2"\
+			"1|2|3|4 2|3|4|1 2|1|3|4 2|3|1|4 1|3|4|2 3|4|2|1 3|1|4|2 3|4|1|2 1|3|2|4 3|2|4|1 3|1|2|4 3|2|1|4 1|2|4|3 2|4|3|1 2|1|4|3 2|4|1|3 1|4|3|2 4|3|2|1 4|1|3|2 4|3|1|2 1|4|2|3 4|2|3|1 4|1|2|3 4|2|1|3");
+	"${@}";
+# à la place de la suppression des xkm
+# sudo dpkg-reconfigure xkb-data
+	function fonct_sup {
+################################################################
+# gestion de la liste des blocs à introduire dans l'alphabet
+################################################################
+	function alp_gestion_blocs {
+# il s'agit de faire passer le nom du bloc d'une liste à l'autre, en fonction de la présence ou de l'absence de la coche "✓"
+		local bloc_trait="${1}" ;
+		local inclus="${2}" ;
+		local exclus="${3}" ;
+		local fic_temp="$(tempfile --prefix="alp_" --suffix=".tmp")" ;
+		cat /dev/null > "${fic_temp}" ;
+		function alp_les_blocs {
+			{ echo -n "2:" ; cat "${inclus}" "${exclus}" ; } | sup_nul | tr "\n" ":"  ;
+			}
+		function alp_retrait {
+			{ cat "${exclus}" ; echo "${bloc_trait:1}" ; } | sort >"${fic_temp}" ;
+			cat "${fic_temp}" > "${exclus}" ;
+			grep -v -e "${bloc_trait:1}" ${inclus} >"${fic_temp}" ;
+			cat "${fic_temp}" > "${inclus}";
+			};
+		function alp_ajout {
+			{ cat "${inclus}" ; echo "${gbl_signe_inclus}${bloc_trait}" ; } | sort >"${fic_temp}" ;
+			cat "${fic_temp}" > "${inclus}" ;
+			grep -v -e "${bloc_trait}" "${exclus}" >"${fic_temp}" ;
+			cat "${fic_temp}" > "${exclus}";
+			};
+		[[ "${bloc_trait:0:1}" = "${gbl_signe_inclus}" ]] && alp_retrait  || alp_ajout ;
+		rm "${fic_temp}";
+		alp_les_blocs;
+	}
+#########################################################
+# Constitution de la liste des blocs de l'alphabet
+##########################################################
+	function alp_blocs {
+		local blocs_unicode blocs_inclus blocs_exclus;
+		blocs_unicode="$(tempfile --prefix="alp_" --suffix=".txt")";
+		alp_nom_blocs > "${blocs_unicode}" && : || return $((${?})) ;
+		blocs_exclus="$(tempfile --prefix="alp_" --suffix=".txt")";
+		cat "${blocs_unicode}" > "${blocs_exclus}"
+		blocs_inclus="$(tempfile --prefix="alp_" --suffix=".txt")";
+		cat /dev/null > "${blocs_inclus}"		
+		! yad --form --title="ucg : Élaboration de la liste des blocs Unicode à introduire dans l'alphabet" --button="gtk-ok:0"  --button=Annuler:1 \
+			--width=900 --item-separator=":" --separator=":" \
+			--always-print-result --sticky --center \
+			--field="Les blocs de la liste ci-dessous marqués du symbole ${gbl_signe_inclus} seront inclus dans l'alphabet après validation:LBL" \
+			--field="Choisir le bloc à intégrer/retirer ou à visualiser en cliquant sur un des deux boutons ci-dessous:CB" \
+			--field="Retirer ou intégrer pour traitement après validation le bloc sélectionné dans le menu déroulant ci-dessus:BTN" \
+			--field="Visualiser le bloc sélectionné dans la liste déroulante ci-dessus:BTN" \
+			"étiquette"  "$(cat ${blocs_unicode} | tr "\n" ":")" \
+			"@${gbl_script} alp_gestion_blocs %2 ${blocs_inclus} ${blocs_exclus}" \
+			"${gbl_script} alp_charge_page true %2" >/dev/null && { gbl_erreur="Arrêt à la demande de l'utilisateur" && return 1; } 
+		cat "${blocs_inclus}"
+		return 0
+		}
+###########################################################
+# Création de la liste des noms de blocs
+###########################################################
+	function alp_carac_unicode {
+		local carac="${1}"  # caractère dont on cherche la traduction unicode
+		local blocs_html="$(tempfile --prefix="alp_" --suffix=".html")";
+		local blocs_txt="$(tempfile --prefix="alp_" --suffix=".txt")";
+		local cr;
+		alp_wget > "${blocs_html}" && {
+			{ echo "<ucg>" && sed -n -r "/data-begin/p" "${blocs_html}" && echo "</ucg>" ; } > "${blocs_txt}" ;
+			}
+		i=1
+		cat "${blocs_txt}" | xmlstarlet sel -t -m "//a[${i}]" -v "./@data-end"
+		cr="${?}";
+		return $((${cr}));
+		}
+
+		exit 0
+	};
+
+
